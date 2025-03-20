@@ -37,21 +37,21 @@ export function ImageResultDisplay({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Generated Image</h2>
+        <h2 className="text-xl font-semibold">生成的图像</h2>
         <div className="space-x-2">
           <Button variant="outline" size="sm" onClick={handleDownload}>
             <Download className="w-4 h-4 mr-2" />
-            Download
+            下载
           </Button>
           {conversationHistory.length > 0 && (
             <Button variant="outline" size="sm" onClick={toggleHistory}>
               <MessageCircle className="w-4 h-4 mr-2" />
-              {showHistory ? "Hide History" : "Show History"}
+              {showHistory ? "隐藏历史记录" : "显示历史记录"}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={onReset}>
             <RotateCcw className="w-4 h-4 mr-2" />
-            Create New Image
+            创建新图像
           </Button>
         </div>
       </div>
@@ -59,21 +59,21 @@ export function ImageResultDisplay({
       <div className="rounded-lg overflow-hidden bg-muted p-2">
         <img
           src={imageUrl}
-          alt="Generated"
+          alt="已生成"
           className="max-w-[640px] h-auto mx-auto"
         />
       </div>
 
       {description && (
         <div className="p-4 rounded-lg bg-muted">
-          <h3 className="text-sm font-medium mb-2">Description</h3>
+          <h3 className="text-sm font-medium mb-2">描述</h3>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
       )}
 
       {showHistory && conversationHistory.length > 0 && (
         <div className="p-4 rounded-lg">
-          <h3 className="text-sm font-medium mb-4">Conversation History</h3>
+          <h3 className="text-sm font-medium mb-4">对话历史</h3>
           <div className="space-y-4">
             {conversationHistory.map((item, index) => (
               <div key={index} className={`p-3 rounded-lg bg-secondary`}>
@@ -82,7 +82,7 @@ export function ImageResultDisplay({
                     item.role === "user" ? "text-foreground" : "text-primary"
                   }`}
                 >
-                  {item.role === "user" ? "You" : "Gemini"}
+                  {item.role === "user" ? "您" : "Gemini"}
                 </p>
                 <div className="space-y-2">
                   {item.parts.map((part: HistoryPart, partIndex) => (
@@ -92,7 +92,7 @@ export function ImageResultDisplay({
                         <div className="mt-2 overflow-hidden rounded-md">
                           <img
                             src={part.image}
-                            alt={`${item.role} image`}
+                            alt={`${item.role} 图像`}
                             className="max-w-64 h-auto object-contain"
                           />
                         </div>

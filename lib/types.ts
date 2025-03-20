@@ -13,6 +13,9 @@ export interface HistoryPart {
   // Image content as data URL (optional)
   // Format: data:image/png;base64,... or data:image/jpeg;base64,...
   image?: string;
+  // Images content as data URL array (optional)
+  // Format: data:image/png;base64,... or data:image/jpeg;base64,...
+  images?: string[];
 }
 
 // Note: When sending to the Gemini API:

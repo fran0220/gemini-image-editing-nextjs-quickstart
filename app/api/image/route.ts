@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   try {
     // Parse JSON request instead of FormData
     const requestData = await req.json();
-    const { prompt, image: inputImage, history } = requestData;
+    const { prompt, images: inputImages, history } = requestData;
 
     if (!prompt) {
       return NextResponse.json(
@@ -71,9 +71,29 @@ export async function POST(req: NextRequest) {
                           };
                         }
                       }
+                      if (part.images && Array.isArray(part.images) && part.images.length > 0 && item.role === "user") {
+                        // Handle multiple images in history
+                        const imageParts = part.images.map(image => {
+                          const imgParts = image.split(",");
+                          if (imgParts.length > 1) {
+                            return {
+                              inlineData: {
+                                data: imgParts[1],
+                                mimeType: image.includes("image/png")
+                                  ? "image/png"
+                                  : "image/jpeg",
+                              },
+                            };
+                          }
+                          return null;
+                        }).filter(p => p !== null);
+                        
+                        return imageParts;
+                      }
                       return { text: "" };
                     })
-                    .filter((part) => Object.keys(part).length > 0), // Remove empty parts
+                    .flat() // Flatten the array to handle multiple images
+                    .filter((part) => Object.keys(part).length > 0) // Remove empty parts
                 };
               })
               .filter((item: FormattedHistoryItem) => item.parts.length > 0) // Remove items with no parts
@@ -87,50 +107,60 @@ export async function POST(req: NextRequest) {
       // Prepare the current message parts
       const messageParts = [];
 
-      // Add the text prompt
-      messageParts.push({ text: prompt });
+      // Add the images if provided
+      if (inputImages && Array.isArray(inputImages) && inputImages.length > 0) {
+        console.log(`Processing ${inputImages.length} images for Gemini API`);
 
-      // Add the image if provided
-      if (inputImage) {
-        // For image editing
-        console.log("Processing image edit request");
+        // Add all images first according to Gemini API format
+        inputImages.forEach(inputImage => {
+          // Check if the image is a valid data URL
+          if (!inputImage.startsWith("data:")) {
+            throw new Error("Invalid image data URL format");
+          }
 
-        // Check if the image is a valid data URL
-        if (!inputImage.startsWith("data:")) {
-          throw new Error("Invalid image data URL format");
-        }
-
-        const imageParts = inputImage.split(",");
-        if (imageParts.length < 2) {
-          throw new Error("Invalid image data URL format");
-        }
-
-        const base64Image = imageParts[1];
-        const mimeType = inputImage.includes("image/png")
-          ? "image/png"
-          : "image/jpeg";
-        console.log(
-          "Base64 image length:",
-          base64Image.length,
-          "MIME type:",
-          mimeType
-        );
-
-        // Add the image to message parts
-        messageParts.push({
-          inlineData: {
-            data: base64Image,
-            mimeType: mimeType,
-          },
+          const imgParts = inputImage.split(",");
+          if (imgParts.length > 1) {
+            messageParts.push({
+              inlineData: {
+                data: imgParts[1],
+                mimeType: inputImage.includes("image/png")
+                  ? "image/png"
+                  : "image/jpeg",
+              },
+            });
+          }
         });
       }
+      
+      // Add the text prompt after all images
+      messageParts.push({ text: prompt });
 
       // Send the message to the chat
       console.log("Sending message with", messageParts.length, "parts");
-      result = await chat.sendMessage(messageParts);
+      try {
+        result = await chat.sendMessage(messageParts);
+      } catch (error) {
+        console.error("Error in chat.sendMessage:", error);
+        // Check if it's a specific Gemini API error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes("500 Internal Server Error") || 
+            errorMessage.includes("An internal error has occurred")) {
+          throw new Error(
+            "Gemini API returned an internal server error. This may happen when processing multiple images. " +
+            "Try with fewer images or a simpler prompt. Original error: " + errorMessage
+          );
+        }
+        throw error;
+      }
     } catch (error) {
-      console.error("Error in chat.sendMessage:", error);
-      throw error;
+      console.error("Error generating image:", error);
+      return NextResponse.json(
+        {
+          error: "Failed to generate image",
+          details: error instanceof Error ? error.message : String(error),
+        },
+        { status: 500 }
+      );
     }
 
     const response = result.response;

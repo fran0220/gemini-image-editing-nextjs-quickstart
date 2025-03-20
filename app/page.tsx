@@ -8,15 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HistoryItem } from "@/lib/types";
 
 export default function Home() {
-  const [image, setImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[] | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
-  const handleImageSelect = (imageData: string) => {
-    setImage(imageData || null);
+  const handleImageSelect = (imageData: string[]) => {
+    setImages(imageData.length > 0 ? imageData : null);
+    // 清除生成的图像，当新图像上传时
+    setGeneratedImage(null);
   };
 
   const handlePromptSubmit = async (prompt: string) => {
@@ -24,13 +26,15 @@ export default function Home() {
       setLoading(true);
       setError(null);
 
-      // If we have a generated image, use that for editing, otherwise use the uploaded image
-      const imageToEdit = generatedImage || image;
+      // 如果我们有一个生成的图像，使用它进行编辑，否则使用上传的图像
+      const imagesToEdit = generatedImage 
+        ? [generatedImage]  // 使用生成的图像进行编辑
+        : images;           // 使用上传的图像进行初始生成
 
-      // Prepare the request data as JSON
+      // 准备请求数据作为 JSON
       const requestData = {
         prompt,
-        image: imageToEdit,
+        images: imagesToEdit,
         history: history.length > 0 ? history : undefined,
       };
 
@@ -44,26 +48,26 @@ export default function Home() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate image");
+        throw new Error(errorData.error || "图像生成失败");
       }
 
       const data = await response.json();
 
       if (data.image) {
-        // Update the generated image and description
+        // 更新生成的图像和描述
         setGeneratedImage(data.image);
         setDescription(data.description || null);
 
-        // Update history locally - add user message
+        // 更新历史记录 - 添加用户消息
         const userMessage: HistoryItem = {
           role: "user",
           parts: [
             { text: prompt },
-            ...(imageToEdit ? [{ image: imageToEdit }] : []),
+            ...(imagesToEdit && imagesToEdit.length > 0 ? [{ images: imagesToEdit }] : []),
           ],
         };
 
-        // Add AI response
+        // 添加 AI 响应
         const aiResponse: HistoryItem = {
           role: "model",
           parts: [
@@ -72,21 +76,21 @@ export default function Home() {
           ],
         };
 
-        // Update history with both messages
+        // 更新历史记录，包含两条消息
         setHistory((prevHistory) => [...prevHistory, userMessage, aiResponse]);
       } else {
-        setError("No image returned from API");
+        setError("API 未返回图像");
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "An error occurred");
-      console.error("Error processing request:", error);
+      setError(error instanceof Error ? error.message : "发生错误");
+      console.error("请求处理错误:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleReset = () => {
-    setImage(null);
+    setImages(null);
     setGeneratedImage(null);
     setDescription(null);
     setLoading(false);
@@ -94,11 +98,13 @@ export default function Home() {
     setHistory([]);
   };
 
-  // If we have a generated image, we want to edit it next time
-  const currentImage = generatedImage || image;
-  const isEditing = !!currentImage;
+  // 确定是否处于编辑模式
+  const isEditing = !!generatedImage;
 
-  // Get the latest image to display (always the generated image)
+  // 获取要在上传组件中显示的图像
+  const currentImages = isEditing ? null : images;
+
+  // 获取要显示的最新图像（始终是生成的图像）
   const displayImage = generatedImage;
 
   return (
@@ -107,10 +113,10 @@ export default function Home() {
         <CardHeader className="flex flex-col items-center justify-center space-y-2">
           <CardTitle className="flex items-center gap-2 text-foreground">
             <Wand2 className="w-8 h-8 text-primary" />
-            Image Creation & Editing
+            图像创建与编辑
           </CardTitle>
           <span className="text-sm font-mono text-muted-foreground">
-            powered by Google DeepMind Gemini 2.0 Flash
+            你可以上传图片进行编辑，也可以输入文字直接生成😊
           </span>
         </CardHeader>
         <CardContent className="space-y-6 pt-6 w-full">
@@ -124,7 +130,7 @@ export default function Home() {
             <>
               <ImageUpload
                 onImageSelect={handleImageSelect}
-                currentImage={currentImage}
+                currentImages={currentImages}
               />
               <ImagePromptInput
                 onSubmit={handlePromptSubmit}
@@ -139,7 +145,7 @@ export default function Home() {
             >
               <ImageIcon className="w-10 h-10 text-gray-200 dark:text-muted-foreground" />
               <span className="pl-4 font-mono font-xs text-muted-foreground">
-                Processing...
+                处理中...
               </span>
             </div>
           ) : (
